@@ -1,7 +1,3 @@
-# Herramientas locales
-.claude/
-CLAUDE.md
-
 # Python
 __pycache__/
 *.pyc
