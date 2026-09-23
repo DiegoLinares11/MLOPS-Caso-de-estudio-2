@@ -38,10 +38,15 @@ inferidos van con borde punteado.
 Hay 6 fuentes. Los formatos se eligieron **distintos a propósito**: en un sistema real cada
 proveedor entrega sus datos a su manera, y el trabajo de Silver es unificarlos.
 
-### A. POS del restaurante — `landing/pos/fecha=AAAA-MM-DD/<restaurante>.csv`
+### A. POS del restaurante — `landing/pos/fecha=AAAA-MM-DD/pos_AAAA-MM-DD.csv`
 
-Cada restaurante sube un archivo por día (batch, H4). **Una fila por línea del ticket**, que
-es el formato típico de exportación de un POS.
+Un archivo por día con los tickets de todos los restaurantes (batch, H4). **Una fila por línea
+del ticket**, que es el formato típico de exportación de un POS.
+
+> **Decisión de la réplica:** en la realidad cada restaurante enviaría su propio archivo
+> (~126 al día, ~46,000 al año). Aquí se consolidan en uno por día para evitar el *small files
+> problem*: Spark pierde mucho tiempo abriendo miles de archivos diminutos. Un reenvío (E1)
+> llega como un archivo extra: `pos_AAAA-MM-DD_reenvio_R012.csv`.
 
 | Columna | Tipo | Ejemplo | Nota |
 |---|---|---|---|
@@ -62,9 +67,14 @@ es el formato típico de exportación de un POS.
 
 ### B. App McDonald's GT — `landing/app/fecha=AAAA-MM-DD/pedidos.jsonl`
 
-Pedidos de McDelivery y "pide y recoge" en la app. Es **JSON anidado**: un pedido trae dentro
-sus líneas. Los nombres de campo están **en inglés**, como suele entregarlos el proveedor de la
-app.
+Pedidos de McDelivery (`MCDELIVERY`) y "pide y recoge" (`PICKUP`) en la app. Es **JSON
+anidado**: un pedido trae dentro sus líneas. Los nombres de campo están **en inglés**, como
+suele entregarlos el proveedor de la app. La carpeta `fecha=` es la fecha **UTC** del pedido,
+no la de Guatemala.
+
+Cada línea del archivo es un **evento**. Un pedido normal genera un evento `DELIVERED` o
+`PICKED_UP`, y si se cancela llega un segundo evento `CANCELLED` con el mismo `order_id` y un
+`updated_at` posterior.
 
 ```json
 {
@@ -73,6 +83,7 @@ app.
   "store_id": 12,
   "channel": "MCDELIVERY",
   "created_at": "2025-10-03T19:45:10Z",
+  "updated_at": "2025-10-03T20:21:44Z",
   "status": "DELIVERED",
   "items": [
     {"sku": "P-BIGMAC", "name": "Big Mac", "qty": 1, "unit_price": 45.5, "type": "PRODUCT"},
@@ -90,7 +101,9 @@ Diferencias con el POS que Silver debe resolver:
 
 ### C. CRM de clientes — `landing/crm/clientes.json`
 
-Exportación de las cuentas registradas en la app.
+Exportación de las cuentas registradas en la app. Es **un solo arreglo JSON** (`[{...}, {...}]`),
+como lo devolvería una API, y no JSON Lines. Por eso Bronze tendrá que leerlo con la opción
+`multiLine`.
 
 | Campo | Tipo | Nota |
 |---|---|---|
@@ -104,7 +117,9 @@ Exportación de las cuentas registradas en la app.
 
 ### D. Maestro de restaurantes — `landing/maestros/restaurantes.csv`
 
-`restaurante_id`, `nombre`, `departamento`, `municipio`, `tiene_automac`, `tiene_mcdelivery`, `fecha_apertura`
+`restaurante_id`, `nombre`, `departamento`, `municipio`, `tiene_automac` (`SI`/`NO`),
+`tiene_mcdelivery` (`SI`/`NO`), `fecha_apertura`. El restaurante `R009` abre **durante** el
+periodo (15-mar-2026).
 
 ### E. Catálogo de recompensas — `landing/maestros/catalogo_recompensas.csv`
 
@@ -116,7 +131,8 @@ versión de la recompensa, con su rango de vigencia.
 ### F. Programa anterior — `landing/legado/puntos_mcdelivery.csv`
 
 Foto de los saldos al **27 de agosto de 2025**, día del lanzamiento: `email`, `saldo_puntos`
-(a 1 pt por Q1), `ultima_compra`.
+(a 1 pt por Q1), `ultima_compra` en formato **`dd/mm/aaaa`**, distinto al ISO del resto de
+fuentes.
 
 ## 3. Errores inyectados y dónde se corrigen
 
@@ -131,8 +147,8 @@ borran**: van a una tabla de **cuarentena** con el motivo, para que se puedan au
 | E4 | `codigo_lealtad` en minúsculas o con espacios | A | 4 % | `upper(trim())` antes del join |
 | E5 | Código de lealtad **que no existe** en el CRM | A | 1 % | Cuarentena |
 | E6 | `total_ticket_q` no cuadra con la suma de líneas | A | 1 % | Se recalcula desde las líneas; se marca el ticket |
-| E7 | Ticket **anulado** (llega una segunda fila con `ANULADA`) | A | 2 % | Se queda el último estado → genera REVERSO (H3) |
-| E8 | Evento de la app **duplicado** (entrega "al menos una vez") | B | 3 % | Deduplicar por `order_id`, quedarse con el último |
+| E7 | Ticket **anulado** (llega una segunda fila con `ANULADA`) | A | 2 % | El ticket queda anulado y no acumula; si traía canje, los puntos **no se devuelven** (R14) |
+| E8 | Evento de la app **duplicado** (entrega "al menos una vez") | B | 3 % | Deduplicar por `order_id`, quedarse con el último `updated_at` |
 | E9 | Pedido cancelado después de entregado | B | 2 % | Igual que E7 |
 | E10 | Canje en McDelivery **bajo el mínimo** Q50/Q60 (R15) | B | 0.5 % | Se marca como violación de regla |
 | E11 | Campos faltantes en el JSON | B | 1 % | Cuarentena si falta una llave; nulo si es opcional |
@@ -151,9 +167,46 @@ borran**: van a una tabla de **cuarentena** con el motivo, para que se puedan au
 | Restaurantes | 30 (de 126) | Suficiente para ver diferencias por departamento |
 | Clientes | 5,000 | Cabe en Databricks Free Edition |
 | Periodo | **27-ago-2025 → 20-sep-2026** (~13 meses) | Debe pasar de 365 días para que **haya vencimientos reales** (R10) |
-| Tickets | ~60,000–80,000 | Del orden de 1 ticket por cliente cada 3 semanas |
+| Tickets | **57,196** (49,607 POS + 7,589 app; 17,072 anónimos) | Resultado real del generador con semilla 42 |
 
-## 5. Arquitectura
+## 5. La hoja de respuestas (Volume `control`)
+
+El generador (`notebooks/00_generador_datos.py`) lleva **su propia contabilidad de puntos**, en
+Python puro, y la guarda en un Volume aparte que **el pipeline nunca lee**:
+
+| Archivo | Contenido |
+|---|---|
+| `saldos_esperados.csv` | Por cliente: acumulados, bienvenida, migrados, canjeados, vencidos, perdidos por tope y saldo al cierre |
+| `errores_inyectados.json` | Los registros que traen cada error E1–E18 |
+| `resumen_esperado.json` | Totales del programa |
+
+En la Fase 5 se compara Gold contra esta hoja. Son **dos implementaciones independientes** de
+las mismas reglas (Python puro vs. Spark): si llegan al mismo saldo para ~5,000 clientes, el
+pipeline es confiable.
+
+Supuestos que ambas implementaciones comparten:
+
+- Cada abono es un **lote** que vence 365 días después (R10), **al inicio del día**.
+- Los canjes consumen **primero los lotes más viejos** (FIFO) y solo usan lotes de **días
+  anteriores**, porque la acreditación tarda hasta 24 horas (R9).
+- El tope de 1,000 puntos por día (R8) aplica solo a las compras, en orden cronológico y por
+  día calendario de Guatemala.
+- La bienvenida (1,000 pts) se abona con la **primera compra que acumula** y no cuenta para el
+  tope.
+- La migración del programa anterior se abona el día del registro en MiMcDonald's (o el día del
+  lanzamiento, si se registró antes) y vale ×10 (H1).
+- Un ticket anulado o cancelado no acumula. Como el corte es diario, la anulación llega en el
+  mismo lote que la compra y no hace falta un movimiento de `REVERSO`. En un sistema incremental
+  sí haría falta.
+
+### Primeros hallazgos que salen de los datos
+
+| Hallazgo | Dato |
+|---|---|
+| El tope diario castiga los pedidos grandes | El 23 % de los tickets de caja y el 45 % de los pedidos de la app superan Q100; se pierde **~18 %** de los puntos por tope |
+| Vencimiento masivo al año del lanzamiento | Los puntos migrados se abonaron en ago-sep 2025 y vencen en ago-sep 2026 |
+
+## 6. Arquitectura
 
 Ver [diagramas/arquitectura.md](../diagramas/arquitectura.md): la arquitectura actual inferida
 y la réplica medallion en Databricks.

@@ -55,7 +55,7 @@ con un **supuesto explícito** en nuestra réplica.
 |---|---|---|---|
 | H1 | **La tasa de conversión del programa legado no está publicada.** Puntos McDelivery daba 1 pt/Q1 y MiMcDonald's da 10 pts/Q1. Si se convirtió 1:1, los clientes antiguos perdieron el 90 % del valor. | Riesgo reputacional y de conciliación contable | Conversión ×10 (mismo valor en quetzales) |
 | H2 | **Base de cálculo con IVA.** No se dice explícitamente si se suma sobre el total con IVA o sobre el subtotal. | Cambia un 12 % el pasivo en puntos | Total pagado con IVA (así lo sugiere "por cada quetzal gastado") |
-| H3 | **No se dice qué pasa con los puntos ganados en una orden cancelada o devuelta.** Solo se cubre el caso inverso (R14). | Posible fraude: comprar, acumular y cancelar | El ledger incluye movimientos de REVERSO |
+| H3 | **No se dice qué pasa con los puntos ganados en una orden cancelada o devuelta.** Solo se cubre el caso inverso (R14). | Posible fraude: comprar, acumular y cancelar | Un ticket anulado o cancelado no acumula. En la réplica la anulación llega en el mismo lote diario; en producción haría falta un movimiento de `REVERSO` |
 | H4 | **La acreditación en ≤24 h indica procesamiento batch** (carga nocturna), no tiempo real. | Justifica una arquitectura medallion batch | Pipeline diario |
 | H5 | **El tope diario de 1,000 puntos no define el "día" ni el orden de corte** (zona horaria, qué transacción se recorta primero). | Resultados distintos según la implementación | Día calendario en `America/Guatemala`, orden cronológico |
 | H6 | **"Dos correos = dos cuentas"** y el teléfono es opcional: no hay forma de detectar a una misma persona con varias cuentas. | Abuso de la bienvenida (quesoburguesa + 1,000 pts) | Generaremos un % de cuentas duplicadas para detectarlas |
@@ -70,7 +70,7 @@ Las reglas definen las **entidades mínimas** del sistema:
 - **Canal** — 6 incluidos + excluidos (para poder filtrarlos)
 - **Transacción** (cabecera) y **línea de transacción** (producto, donación, canje)
 - **Catálogo de recompensas** — versionado en el tiempo
-- **Movimiento de puntos (ledger)** — tipos: `ACUMULACION`, `BIENVENIDA`, `MIGRACION`, `CANJE`, `REVERSO`, `VENCIMIENTO`
+- **Movimiento de puntos (ledger)** — tipos: `ACUMULACION`, `BIENVENIDA`, `MIGRACION`, `CANJE`, `VENCIMIENTO` (y `REVERSO` en un sistema incremental)
 
 La decisión central: **el saldo de puntos no se guarda, se calcula** a partir del ledger. Es el
 mismo principio de la contabilidad de doble partida, y es lo que permite cumplir R10/R11

@@ -7,3 +7,6 @@ __pycache__/
 # Sistema operativo
 .DS_Store
 Thumbs.db
+
+# Datos generados en local
+_datos_locales/
