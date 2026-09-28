@@ -122,11 +122,13 @@ flowchart LR
 
     subgraph GLD["GOLD · reglas de negocio"]
         direction TB
+        G0[("gold_lotes_puntos<br/>FIFO applyInPandas")]
         G1[("gold_movimientos_puntos<br/>ledger")]
         G2[("gold_saldos")]
         G3[("gold_puntos_por_vencer")]
-        G4[("gold_kpis_programa")]
-        G5[("gold_señales_fraude")]
+        G4[("gold_kpis_mensuales<br/>gold_kpis_canal")]
+        G5[("gold_senales_fraude")]
+        G6[("gold_violaciones_reglas")]
     end
 
     subgraph USO["Consumo"]
@@ -152,11 +154,14 @@ flowchart LR
     B6 --> S6
     B1 & B2 & B3 & B6 -.-> SQ
 
-    S1 & S3 & S4 & S5 & S6 --> G1
-    G1 --> G2 & G3 & G5
-    G1 & S2 --> G4
+    S1 & S3 & S4 & S5 & S6 --> G0
+    G0 --> G1
+    G0 --> G3
+    G1 --> G2 & G5
+    G1 & S3 --> G4
+    S3 & S4 & S5 & G0 --> G6
 
-    G1 --> U1
+    G1 & G6 --> U1
     G2 & G3 & G4 --> U2
     G5 --> U3
 
@@ -166,7 +171,7 @@ flowchart LR
     classDef cuarentena fill:#f8d7da,stroke:#b02a37,color:#58151c
     class B1,B2,B3,B4,B5,B6 bronze
     class S1,S2,S3,S4,S5,S6 silver
-    class G1,G2,G3,G4,G5 gold
+    class G0,G1,G2,G3,G4,G5,G6 gold
     class SQ cuarentena
 ```
 

@@ -14,7 +14,7 @@ Databricks Free Edition.
 |---|---|---|
 | 1. Entendimiento del negocio | [docs/01_entendimiento_negocio.md](docs/01_entendimiento_negocio.md) | Listo |
 | 2. Entendimiento de los datos | [docs/02_entendimiento_datos.md](docs/02_entendimiento_datos.md) · [diagramas/arquitectura.md](diagramas/arquitectura.md) | Listo |
-| 3. Preparación de datos | [docs/03_preparacion_datos.md](docs/03_preparacion_datos.md) · [docs/arquitectura_medallion.md](docs/arquitectura_medallion.md) · notebooks 00, 01 y 02 | En curso |
+| 3. Preparación de datos | [docs/03_preparacion_datos.md](docs/03_preparacion_datos.md) · [docs/arquitectura_medallion.md](docs/arquitectura_medallion.md) · notebooks 00 a 03 | Listo |
 | 4. Modelado | Propuesta de ML/AI/LLM | Pendiente |
 | 5. Evaluación | POC del motor de puntos con pruebas | Pendiente |
 | 6. Despliegue | Reporte final y recomendaciones | Pendiente |
@@ -29,6 +29,8 @@ Databricks Free Edition.
    que tengan las filas esperadas.
 5. Correr `notebooks/02_silver.py`: crea las 7 tablas `silver_*` y verifica que se detectaron
    todos los errores inyectados.
+6. Correr `notebooks/03_gold.py`: aplica las reglas del programa, crea las 8 tablas `gold_*` y
+   verifica el cuadre contable.
 
 También corre en local (`python notebooks/00_generador_datos.py`): escribe en `./_datos_locales/`.
 
@@ -41,5 +43,6 @@ MLOPS-Caso-de-estudio-2/
 └── notebooks/   # Notebooks de Databricks (formato .py)
     ├── 00_generador_datos.py   # Genera las fuentes sintéticas y la hoja de respuestas
     ├── 01_bronze.py            # Landing → 6 tablas bronze_*, todo como texto
-    └── 02_silver.py            # Bronze → 7 tablas silver_*, limpias y unificadas
+    ├── 02_silver.py            # Bronze → 7 tablas silver_*, limpias y unificadas
+    └── 03_gold.py              # Silver → ledger de puntos, saldos, KPIs y violaciones
 ```

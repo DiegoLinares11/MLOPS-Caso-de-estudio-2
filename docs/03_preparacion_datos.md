@@ -115,3 +115,54 @@ Spark no puede leer archivos locales en Windows sin los binarios de Hadoop (`win
 se armó un arnés de prueba: construye Bronze **en memoria** a partir de los mismos archivos (todo
 texto, mismos metadatos) y ejecuta el notebook de Silver celda por celda en Spark 4.2 local, con
 el modo ANSI activo como en Serverless.
+
+## Notebook 03 · Gold
+
+Gold es el **único lugar** donde viven las reglas del programa (R1–R22), cada una como una
+constante con nombre y su referencia a la Fase 1.
+
+### Decisiones
+
+| Decisión | Alternativa descartada | Por qué |
+|---|---|---|
+| El saldo **se calcula** sumando el ledger | Guardar un saldo que se actualiza | Cualquier saldo se puede auditar hasta la compra que lo originó; es el principio de la contabilidad |
+| Tope diario (R8) con una *window*: `min(1000, S) − min(1000, S − puntos)` | Un ciclo por cliente y día | Se resuelve en paralelo con SQL puro, sin Python |
+| Vencimiento FIFO con **`applyInPandas`** por cliente | *Window functions* | El vencimiento de cada lote depende de lo que consumieron los canjes y de lo que venció antes: es **secuencial**. `applyInPandas` lo resuelve cliente por cliente, repartiendo los clientes entre los núcleos |
+| Costo del canje con *join* por **rango de fechas** contra el catálogo SCD2 | Usar el precio actual | El Big Tasty costaba 7,000 antes de marzo y 7,500 después; usar el precio actual cambiaría saldos históricos |
+| `gold_lotes_puntos` se **materializa** como tabla | `.cache()` | Serverless no permite `.cache()`, y el FIFO es el cálculo más caro; además deja evidencia |
+| `try_divide` en porcentajes | `/` | En modo ANSI, `0/0` detiene el pipeline (pasa en los canales excluidos, que tienen 0 puntos) |
+| Fecha de corte = **último día con datos** | Una fecha fija en el código | El notebook sirve igual si mañana llegan más datos |
+| Gold **no lee** la hoja de respuestas | Validar contra `control` aquí | El pipeline no debe depender de la evaluación; Gold se valida solo con un cuadre contable y la comparación va en la Fase 5 |
+| Tabla de **violaciones de reglas** | Solo calcular puntos | Gold también audita: una violación es un error del sistema del cliente y un hallazgo para el reporte |
+
+### Resultado (semilla 42)
+
+| Tabla | Filas |
+|---|---|
+| `gold_lotes_puntos` | 20,062 |
+| `gold_movimientos_puntos` | 43,104 |
+| `gold_saldos` | 5,150 (todos los clientes de Guatemala, incluidos los que tienen saldo 0) |
+| `gold_puntos_por_vencer` | 1,174 lotes |
+| `gold_violaciones_reglas` | 34 (todas R15: canjes en McDelivery bajo el mínimo = E10) |
+| `gold_kpis_mensuales` | 14 meses |
+| `gold_kpis_canal` | 11 canales |
+| `gold_senales_fraude` | 5,150 |
+
+**Cuadre contable:** los 6 controles dan 0. El saldo del ledger coincide con lo que queda en
+los lotes del FIFO para todos los clientes; no hay saldos negativos, acumulaciones en canales
+excluidos o fuera de Guatemala, días por encima del tope ni bienvenidas repetidas.
+
+**Contra la hoja de respuestas** (prueba local, antes de subir): los 5,150 clientes coinciden
+en las 7 métricas (acumulados, bienvenida, migrados, canjeados, vencidos, perdidos por tope y
+saldo final) con **0 diferencias**. Dos implementaciones independientes de las reglas (Python
+puro en el generador, Spark en Gold) llegan al mismo resultado.
+
+### Hallazgos que salen de Gold
+
+| Hallazgo | Dato |
+|---|---|
+| **El tope diario castiga a McDelivery** | El 60 % de sus pedidos pasa de Q100 y pierde el **35 %** de sus puntos por el tope, contra ~13 % en mostrador, AutoMac y kiosco |
+| El programa emite más puntos por **migración** que por compras | 19.5 M migrados vs 18.3 M acumulados en 13 meses |
+| **Breakage** alto | 9.3 M puntos vencidos sin usarse, la mitad de lo acumulado por compras |
+| La app no valida el mínimo de canje en McDelivery | 34 canjes bajo Q50/Q60 (R15) |
+| Los canales de terceros mueven ventas grandes que no se miden | PedidosYa y Uber Eats: ticket promedio de ~Q129, 0 puntos y 0 clientes identificados |

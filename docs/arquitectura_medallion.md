@@ -134,8 +134,9 @@ A partir del ledger se construyen las demás tablas Gold:
 |---|---|
 | `gold_saldos` | ¿Cuántos puntos tiene hoy cada cliente? (suma del ledger) |
 | `gold_puntos_por_vencer` | ¿A quién se le vencen puntos en los próximos 30 días? (R11) |
-| `gold_kpis_programa` | ¿Cuántos puntos se emiten, canjean y vencen por mes, restaurante y canal? |
-| `gold_señales_fraude` | ¿Qué cuentas se comportan raro? (insumo para ML) |
+| `gold_kpis_mensuales` / `gold_kpis_canal` | ¿Cuántos puntos se emiten, canjean y vencen por mes? ¿Cómo se comporta cada canal? |
+| `gold_violaciones_reglas` | ¿Qué transacciones rompieron una regla del programa? |
+| `gold_senales_fraude` | ¿Qué cuentas se comportan raro? (insumo para ML) |
 
 ---
 
