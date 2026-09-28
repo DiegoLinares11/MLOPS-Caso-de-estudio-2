@@ -8,24 +8,29 @@ capa, documentando cada decisión. La teoría general de las capas está en
 |---|---|---|---|
 | [00_generador_datos.py](../notebooks/00_generador_datos.py) | — | — | Volumes `landing` y `control` |
 | [01_bronze.py](../notebooks/01_bronze.py) | Bronze | Volume `landing` | 6 tablas `bronze_*` |
-| 02_silver.py | Silver | Tablas `bronze_*` | Tablas `silver_*` + `silver_cuarentena` |
-| 03_gold.py | Gold | Tablas `silver_*` | Tablas `gold_*` |
+| [02_silver.py](../notebooks/02_silver.py) | Silver | Tablas `bronze_*` | 8 tablas `silver_*` |
+| [03_gold.py](../notebooks/03_gold.py) | Gold | Tablas `silver_*` | 8 tablas `gold_*` |
 
-Todo vive en `workspace.mimcdonalds`, en el workspace compartido del equipo.
+Todo vive en `workspace.mimcdonalds`, en el workspace compartido del equipo. Los números de este
+documento corresponden a los **datos v2** (semilla 42, con perfiles de gustos; ver Fase 4).
 
 ---
 
 ## Notebook 00 · Generador
 
-Ejecutado en Databricks (Serverless) con semilla 42. Los conteos de errores coinciden exactamente
-con la corrida local, lo que confirma que el generador es **reproducible**.
+Corre igual en Databricks y en local, y es **reproducible**: con la misma semilla, los conteos
+en Databricks coincidieron exactamente con los de la corrida local.
 
 | Salida | Contenido |
 |---|---|
-| `landing/pos/` | 390 archivos diarios + 6 reenvíos (E1) |
+| `landing/pos/` | 390 archivos diarios + 11 reenvíos (E1) |
 | `landing/app/` | 390 archivos diarios (fecha UTC) |
 | `landing/crm/`, `maestros/`, `legado/` | 4 archivos |
-| `control/` | Hoja de respuestas: saldos esperados, errores inyectados, resumen |
+| `control/` | Hoja de respuestas: saldos esperados, errores inyectados, segmentos de gustos y resumen |
+
+**v2 (Fase 4):** se agregaron perfiles de gustos por cliente, porque con la v1 no había
+preferencias que un recomendador pudiera aprender. Regenerar los datos cambió todos los conteos
+y rompió las pruebas que comparaban contra números fijos (ver abajo).
 
 ## Notebook 01 · Bronze
 
@@ -41,20 +46,18 @@ con la corrida local, lo que confirma que el generador es **reproducible**.
 | `mode("overwrite")` en cada corrida | Anexar (`append`) | Idempotencia: correr dos veces no duplica datos |
 | `COMMENT ON TABLE` en cada tabla | Documentar solo en el repo | La descripción queda en Unity Catalog, junto al dato |
 | CRM leído con `multiLine=true` | — | El CRM es un solo arreglo JSON, no JSON Lines |
+| Comprobación: contar las filas **en los archivos con Python** y compararlas con la tabla | Comparar contra números fijos | Son dos conteos independientes, y la prueba sirve con cualquier dato. La primera versión usaba números fijos de la semilla 42 y se rompió al regenerar |
 
-### Resultado esperado (semilla 42)
+### Resultado (datos v2)
 
 | Tabla | Filas | Qué contiene |
 |---|---|---|
-| `bronze_pos_lineas` | 95,055 | Líneas de ticket, incluidas 68 de archivos reenviados y 1,844 filas `ANULADA` |
-| `bronze_app_pedidos` | 7,977 | Eventos: 7,589 pedidos + 144 cancelaciones + 244 duplicados |
+| `bronze_pos_lineas` | 93,367 | Líneas de ticket, incluidas 70 de archivos reenviados y las filas `ANULADA` de 946 tickets |
+| `bronze_app_pedidos` | 7,916 | Eventos: 7,522 pedidos + 152 cancelaciones + 242 duplicados |
 | `bronze_clientes` | 5,250 | Incluye 150 cuentas duplicadas y 100 de Honduras |
 | `bronze_restaurantes` | 30 | |
 | `bronze_catalogo` | 12 | Versiones de recompensas |
-| `bronze_legado` | 1,817 | Incluye 272 correos no registrados y 7 saldos negativos |
-
-El notebook termina con un `assert` que compara estos números. Si alguno no coincide, se
-detiene en lugar de dejar una capa incompleta.
+| `bronze_legado` | 1,682 | Incluye 252 correos no registrados y 7 saldos negativos |
 
 ### Cómo se ve en Unity Catalog
 
@@ -62,8 +65,7 @@ En **Catalog → workspace → mimcdonalds → (tabla)**:
 
 - **Overview:** la descripción de `COMMENT ON TABLE` y el esquema (todo `string`).
 - **Sample data:** una muestra de filas, con los errores tal como llegaron.
-- **Lineage:** el grafo que muestra que la tabla sale del Volume `landing`. Se completará
-  solo cuando Silver y Gold lean estas tablas con `spark.table(...)`.
+- **Lineage:** el grafo que muestra de dónde sale cada tabla.
 
 ## Notebook 02 · Silver
 
@@ -85,36 +87,34 @@ registra el linaje Bronze → Silver.
 | Departamentos: **tabla de referencia** de los 22 oficiales | Corregir caso por caso | Mismo motivo |
 | Teléfonos a **E.164** usando el país de la cuenta | Asumir siempre +502 | Un número de 8 dígitos puede ser de Honduras |
 | Cuarentena: **una sola tabla** con fuente, motivo y registro original en JSON | Descartar filas | "¿Cuántos datos perdimos y por qué?" se responde con un `GROUP BY` |
-| Expectativas + `assert` al final | Revisar a ojo | Si Silver no cumple, el notebook se detiene y no publica una capa sucia |
+| Expectativas universales + `assert` | Revisar a ojo | Si Silver no cumple, el notebook se detiene y no publica una capa sucia |
+| Detecciones guardadas en `silver_calidad_detecciones`; la comparación contra lo inyectado va en la Fase 5 | Comparar aquí contra números fijos | El pipeline **no debe leer la hoja de respuestas** (en producción no existe), y los números fijos se rompen al cambiar los datos |
+| E8 se cuenta como **pedidos** con eventos duplicados | Contar eventos sobrantes | Hay que definir exactamente la unidad de la métrica: un pedido con sus dos eventos duplicados es 1 pedido afectado, no 2 |
 
-### Resultado esperado (semilla 42)
+### Resultado (datos v2)
 
 | Tabla | Filas |
 |---|---|
 | `silver_restaurantes` | 30 |
 | `silver_clientes` | 5,250 (300 marcadas como sospecha de duplicado: 150 principales + 150 duplicadas) |
 | `silver_catalogo` | 12 |
-| `silver_transacciones` | 57,133 (49,607 POS + 7,526 app) |
-| `silver_lineas` | 112,870 |
-| `silver_legado` | 1,810 (272 pendientes de registro) |
-| `silver_cuarentena` | 70 (63 de la app + 7 del legado) |
+| `silver_transacciones` | 56,184 (48,717 POS + 7,467 app) |
+| `silver_lineas` | 111,212 |
+| `silver_legado` | 1,675 (252 pendientes de registro) |
+| `silver_cuarentena` | 62 (55 de la app + 7 del legado) |
+| `silver_calidad_detecciones` | 17 (un conteo por tipo de error) |
 
-### Verificación contra la hoja de respuestas
-
-Silver cuenta la huella de cada error y la compara con lo que el generador inyectó. **Los 17
-errores que le tocan a Silver cuadran exactamente.** (E10 es una violación de regla y la
-detecta Gold.)
-
-Dos conteos difieren del resumen del generador, y está bien que así sea: 5 pedidos con evento
-duplicado (E8) y 2 cancelados (E9) **además** tenían un campo faltante (E11). Silver los manda
-a cuarentena antes de deduplicar, así que no los cuenta dos veces: 244 → 239 y 144 → 142.
+**Las 12 expectativas dan 0 problemas**, y en la prueba local los 17 conteos de
+`silver_calidad_detecciones` coinciden con lo que el generador inyectó. Cuando un pedido tiene
+dos errores a la vez (por ejemplo, un evento duplicado E8 **y** un campo faltante E11), Silver lo
+manda primero a cuarentena y ya no lo cuenta en otra métrica.
 
 ### Cómo se probó antes de subirlo
 
 Spark no puede leer archivos locales en Windows sin los binarios de Hadoop (`winutils`), así que
 se armó un arnés de prueba: construye Bronze **en memoria** a partir de los mismos archivos (todo
-texto, mismos metadatos) y ejecuta el notebook de Silver celda por celda en Spark 4.2 local, con
-el modo ANSI activo como en Serverless.
+texto, mismos metadatos) y ejecuta los notebooks celda por celda en Spark 4.2 local, con el modo
+ANSI activo como en Serverless.
 
 ## Notebook 03 · Gold
 
@@ -135,15 +135,15 @@ constante con nombre y su referencia a la Fase 1.
 | Gold **no lee** la hoja de respuestas | Validar contra `control` aquí | El pipeline no debe depender de la evaluación; Gold se valida solo con un cuadre contable y la comparación va en la Fase 5 |
 | Tabla de **violaciones de reglas** | Solo calcular puntos | Gold también audita: una violación es un error del sistema del cliente y un hallazgo para el reporte |
 
-### Resultado (semilla 42)
+### Resultado (datos v2)
 
 | Tabla | Filas |
 |---|---|
-| `gold_lotes_puntos` | 20,062 |
-| `gold_movimientos_puntos` | 43,104 |
+| `gold_lotes_puntos` | 19,628 |
+| `gold_movimientos_puntos` | 41,751 |
 | `gold_saldos` | 5,150 (todos los clientes de Guatemala, incluidos los que tienen saldo 0) |
-| `gold_puntos_por_vencer` | 1,174 lotes |
-| `gold_violaciones_reglas` | 34 (todas R15: canjes en McDelivery bajo el mínimo = E10) |
+| `gold_puntos_por_vencer` | 1,066 lotes |
+| `gold_violaciones_reglas` | 33 (todas R15: canjes en McDelivery bajo el mínimo = E10) |
 | `gold_kpis_mensuales` | 14 meses |
 | `gold_kpis_canal` | 11 canales |
 | `gold_senales_fraude` | 5,150 |
@@ -152,17 +152,27 @@ constante con nombre y su referencia a la Fase 1.
 los lotes del FIFO para todos los clientes; no hay saldos negativos, acumulaciones en canales
 excluidos o fuera de Guatemala, días por encima del tope ni bienvenidas repetidas.
 
-**Contra la hoja de respuestas** (prueba local, antes de subir): los 5,150 clientes coinciden
-en las 7 métricas (acumulados, bienvenida, migrados, canjeados, vencidos, perdidos por tope y
-saldo final) con **0 diferencias**. Dos implementaciones independientes de las reglas (Python
-puro en el generador, Spark en Gold) llegan al mismo resultado.
+**Contra la hoja de respuestas** (prueba local): los 5,150 clientes coinciden en las 7 métricas
+(acumulados, bienvenida, migrados, canjeados, vencidos, perdidos por tope y saldo final) con
+**0 diferencias**, tanto con los datos v1 como con los v2. Dos implementaciones independientes de
+las reglas (Python puro en el generador, Spark en Gold) llegan al mismo resultado.
+
+| Total del programa (v2) | Puntos |
+|---|---|
+| Acumulados por compras | 18,581,394 |
+| Bienvenida | 4,336,000 |
+| Migrados del programa anterior | 17,835,600 |
+| Canjeados | 20,729,000 |
+| Vencidos | 8,097,012 |
+| Perdidos por el tope diario | 5,277,554 |
+| **Saldo al 20-sep-2026** | **11,926,982** |
 
 ### Hallazgos que salen de Gold
 
 | Hallazgo | Dato |
 |---|---|
-| **El tope diario castiga a McDelivery** | El 60 % de sus pedidos pasa de Q100 y pierde el **35 %** de sus puntos por el tope, contra ~13 % en mostrador, AutoMac y kiosco |
-| El programa emite más puntos por **migración** que por compras | 19.5 M migrados vs 18.3 M acumulados en 13 meses |
-| **Breakage** alto | 9.3 M puntos vencidos sin usarse, la mitad de lo acumulado por compras |
-| La app no valida el mínimo de canje en McDelivery | 34 canjes bajo Q50/Q60 (R15) |
-| Los canales de terceros mueven ventas grandes que no se miden | PedidosYa y Uber Eats: ticket promedio de ~Q129, 0 puntos y 0 clientes identificados |
+| **El tope diario castiga a McDelivery** | El 67 % de sus pedidos pasa de Q100 y pierde el **39 %** de sus puntos por el tope, contra ~17 % en mostrador, AutoMac y kiosco |
+| La migración pesa casi tanto como las compras | 17.8 M puntos migrados vs 18.6 M acumulados en 13 meses |
+| **Breakage** alto | 8.1 M puntos vencidos sin usarse, el 44 % de lo acumulado por compras |
+| La app no valida el mínimo de canje en McDelivery | 33 canjes bajo Q50/Q60 (R15) |
+| Los canales de terceros mueven ventas grandes que no se miden | PedidosYa y Uber Eats: ticket promedio de ~Q135, 0 puntos y 0 clientes identificados |

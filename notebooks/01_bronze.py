@@ -183,17 +183,40 @@ filas_leg = escribir_bronze(
 # MAGIC ### 7.1 ¿Llegó todo?
 # MAGIC
 # MAGIC Cada tabla debe tener **exactamente** las filas de sus archivos: Bronze no descarta nada.
-# MAGIC Los números esperados se calcularon contando las filas de los archivos (semilla 42).
+# MAGIC
+# MAGIC Para comprobarlo se cuentan las filas **de otra forma, sin Spark**: abriendo cada archivo
+# MAGIC con Python y contando sus líneas. Son dos conteos independientes. Además, la prueba funciona
+# MAGIC con **cualquier** dato: no depende de la semilla del generador. (La primera versión comparaba
+# MAGIC contra números fijos y se rompió al regenerar los datos: una prueba atada a un dato concreto
+# MAGIC es frágil.)
 
 # COMMAND ----------
 
+import json
+import os
+
+
+def lineas_de_datos(ruta, extension, encabezado):
+    """Cuenta las filas de datos de todos los archivos con esa extensión bajo `ruta`."""
+    total = 0
+    for raiz, _, archivos in os.walk(ruta):
+        for nombre in archivos:
+            if nombre.endswith(extension):
+                with open(os.path.join(raiz, nombre), encoding="utf-8") as f:
+                    total += sum(1 for linea in f if linea.strip()) - (1 if encabezado else 0)
+    return total
+
+
+with open(f"{LANDING}/crm/clientes.json", encoding="utf-8") as f:
+    cuentas_crm = len(json.load(f))
+
 esperado = {
-    "bronze_pos_lineas": 95_055,
-    "bronze_app_pedidos": 7_977,
-    "bronze_clientes": 5_250,
-    "bronze_restaurantes": 30,
-    "bronze_catalogo": 12,
-    "bronze_legado": 1_817,
+    "bronze_pos_lineas": lineas_de_datos(f"{LANDING}/pos", ".csv", encabezado=True),
+    "bronze_app_pedidos": lineas_de_datos(f"{LANDING}/app", ".jsonl", encabezado=False),
+    "bronze_clientes": cuentas_crm,
+    "bronze_restaurantes": lineas_de_datos(f"{LANDING}/maestros", "restaurantes.csv", encabezado=True),
+    "bronze_catalogo": lineas_de_datos(f"{LANDING}/maestros", "catalogo_recompensas.csv", encabezado=True),
+    "bronze_legado": lineas_de_datos(f"{LANDING}/legado", ".csv", encabezado=True),
 }
 obtenido = {
     "bronze_pos_lineas": filas_pos, "bronze_app_pedidos": filas_app,

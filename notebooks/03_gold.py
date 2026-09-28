@@ -547,7 +547,7 @@ assert all(v == 0 for v in cuadre.values()), "Gold no cuadra"
 # MAGIC ### 11.2 Totales del programa
 # MAGIC
 # MAGIC La comparación **cliente por cliente** contra la hoja de respuestas del generador es el POC de
-# MAGIC la Fase 5 (`04_evaluacion`). Aquí se muestran los totales como primera señal.
+# MAGIC la Fase 5 (`05_evaluacion`). Aquí se muestran los totales como primera señal.
 
 # COMMAND ----------
 

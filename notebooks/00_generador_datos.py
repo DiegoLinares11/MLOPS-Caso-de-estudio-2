@@ -257,6 +257,19 @@ PESO_CANAL = {"MOSTRADOR": 25, "AUTOMAC": 25, "KIOSCO": 12, "MCCAFE": 5, "POSTRE
               "MCDELIVERY": 12, "PICKUP": 6, "PEDIDOSYA": 4, "UBEREATS": 2, "CALLCENTER": 1,
               "WHATSAPP": 1}
 
+# v2 · Perfiles de gustos: segmento -> (proporción de clientes, {producto: multiplicador}).
+# Sesgan lo que el cliente compra y lo que canjea. Sin esto no hay preferencias que aprender
+# (se comprobó en la Fase 4: con la v1, personalizar no superaba a recomendar lo más popular).
+SEGMENTOS = {
+    "RES": (0.30, {"P-BIGMAC": 5, "P-COMBO-BIGMAC": 5, "P-COMBO-CUARTO": 5, "P-BIGTASTY": 5,
+                   "P-QUESOB": 3, "P-HAMB": 3}),
+    "POLLO": (0.22, {"P-MCPOLLO": 6, "P-COMBO-MCPOLLO": 6, "P-NUGGETS6": 6, "P-NUGGETS10": 6}),
+    "DESAYUNO": (0.18, {"P-MCMUFFIN": 5, "P-DESAYUNO-DLX": 5, "P-HOTCAKES": 5, "P-CAFE-AMER": 3}),
+    "CAFE_POSTRE": (0.15, {"P-CAFE-AMER": 5, "P-CAPUCHINO": 5, "P-PASTEL-MANZ": 4, "P-MCFLURRY": 5,
+                           "P-SUNDAE": 4, "P-CONO": 4}),
+    "FAMILIA": (0.15, {"P-CAJITA": 8, "P-NUGGETS10": 3, "P-PAPAS-G": 3, "P-MCFLURRY": 3}),
+}
+
 
 def quitar_tildes(texto):
     return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")
@@ -311,15 +324,18 @@ def canal_para(restaurante, pesos_cliente, solo_app=False):
     return elegir(pesos) if pesos else "MOSTRADOR"
 
 
-def armar_lineas(canal, franja):
+def armar_lineas(canal, franja, gustos=None, items_extra=0.0):
+    """gustos = {producto_id: multiplicador} del cliente (v2). Sin gustos, todos eligen igual."""
+    gustos = gustos or {}
     if canal == "MCCAFE":
         pool, n = [p for p, v in MENU.items() if v[2] == "MCCAFE"], rng.randint(1, 2)
     elif canal == "POSTRES":
         pool, n = [p for p, v in MENU.items() if v[2] == "POSTRE"], rng.randint(1, 2)
     else:
         pool = [p for p, v in MENU.items() if v[2] == "COMIDA" and v[3] in ("TODO", franja)]
-        n = 1 + poisson(2.2 if canal in ("MCDELIVERY", "PEDIDOSYA", "UBEREATS") else 0.8)
-    elegidos = Counter(rng.choices(pool, weights=[PESO_PRODUCTO.get(p, 2) for p in pool], k=n))
+        n = 1 + poisson((2.2 if canal in ("MCDELIVERY", "PEDIDOSYA", "UBEREATS") else 0.8) + items_extra)
+    pesos = [PESO_PRODUCTO.get(p, 2) * gustos.get(p, 1.0) for p in pool]
+    elegidos = Counter(rng.choices(pool, weights=pesos, k=n))
     return [{"producto_id": p, "descripcion": MENU[p][0], "cantidad": q, "precio_cent": MENU[p][1],
              "tipo": "PRODUCTO", "recompensa_id": None} for p, q in elegidos.items()]
 
@@ -398,6 +414,13 @@ class LedgerEsperado:
 # MAGIC si **abandona** el programa (*churn*). Estos rasgos no salen en los archivos, pero dejan
 # MAGIC patrones en los datos que un modelo de ML podría aprender (Fase 4).
 # MAGIC
+# MAGIC **v2 · Perfil de gustos.** Cada cliente pertenece a un segmento oculto (`RES`, `POLLO`,
+# MAGIC `DESAYUNO`, `CAFE_POSTRE`, `FAMILIA`) que multiplica el peso de ciertos productos, tanto al
+# MAGIC **comprar** como al **canjear**, con una intensidad distinta para cada persona. Además, a los de
+# MAGIC `DESAYUNO` les gusta venir temprano, los de `CAFE_POSTRE` van más al McCafé y a los Centros de
+# MAGIC Postres, y los de `FAMILIA` piden más por delivery y en pedidos más grandes. El segmento se
+# MAGIC guarda en la hoja de respuestas para evaluar el recomendador.
+# MAGIC
 # MAGIC Cuentas especiales:
 # MAGIC - **E13 · 3 % de cuentas duplicadas:** misma persona (nombre y teléfono) con otro correo, que
 # MAGIC   compra 1–3 veces para cobrar la bienvenida (H6).
@@ -439,14 +462,27 @@ def fecha_registro(es_legado):
 
 def rasgos_cliente():
     s = 0.9
+    segmento = rng.choices(list(SEGMENTOS), weights=[v[0] for v in SEGMENTOS.values()])[0]
+    # cada cliente del segmento tiene su propia intensidad de gusto (ruido individual)
+    gustos = {p: m * rng.lognormvariate(0, 0.3) for p, m in SEGMENTOS[segmento][1].items()}
+    pesos_canal = {c: p * rng.gammavariate(1.0, 1.0) for c, p in PESO_CANAL.items()}
+    if segmento == "CAFE_POSTRE":
+        pesos_canal["MCCAFE"] *= 5
+        pesos_canal["POSTRES"] *= 5
+    if segmento == "FAMILIA":
+        pesos_canal["MCDELIVERY"] *= 2.5
+        pesos_canal["PICKUP"] *= 1.5
     return {
         "visitas_semana": rng.lognormvariate(math.log(0.22) - s * s / 2, s),
         "restaurante": rng.choices(list(REST.values()), weights=[r["peso"] for r in REST.values()])[0],
-        "pesos_canal": {c: p * rng.gammavariate(1.0, 1.0) for c, p in PESO_CANAL.items()},
-        "p_desayuno": rng.betavariate(1.5, 6),
+        "pesos_canal": pesos_canal,
+        "p_desayuno": rng.betavariate(6, 3) if segmento == "DESAYUNO" else rng.betavariate(1.5, 8),
         "p_muestra_qr": rng.uniform(0.70, 0.98),
         "p_canje": rng.uniform(0.15, 0.80),
         "p_bienvenida": 0.6,
+        "segmento": segmento,
+        "gustos": gustos,
+        "items_extra": 1.2 if segmento == "FAMILIA" else 0.0,
     }
 
 
@@ -556,7 +592,7 @@ def simular_cliente(c):
         restaurante = restaurante_para(dia, c["restaurante"])
         canal = canal_para(restaurante, c["pesos_canal"], solo_app=c["tipo"] == "HONDURAS")
         origen = "APP" if canal in CANALES_APP else "POS"
-        lineas = armar_lineas(canal, franja)
+        lineas = armar_lineas(canal, franja, c["gustos"], c["items_extra"])
         if origen == "POS" and canal not in CANALES_EXCLUIDOS and rng.random() < 0.05:
             lineas.append({"producto_id": DONACION[0], "descripcion": DONACION[1], "cantidad": 1,
                            "precio_cent": rng.choice([100, 200, 300, 500]), "tipo": "DONACION",
@@ -587,7 +623,9 @@ def simular_cliente(c):
                                 if r[2] <= min(saldo, margen_dia) - usados]
                     if not alcanzan:
                         break
-                    ofertas.append(rng.choices(alcanzan, weights=[r[2] for r in alcanzan])[0])
+                    # v2: se canjea lo que gusta (afinidad al cuadrado) y algo más lo caro
+                    pesos = [c["gustos"].get(r[1], 1.0) ** 2 * r[2] for r in alcanzan]
+                    ofertas.append(rng.choices(alcanzan, weights=pesos)[0])
             e10 = False
             if ofertas and canal == "MCDELIVERY" and productos_cent < MINIMO_CANJE_DELIVERY_CENT[franja]:
                 if rng.random() < 0.2:
@@ -902,8 +940,13 @@ print(f"[landing] crm: {len(crm):,} cuentas · restaurantes: {len(RESTAURANTES)}
 # MAGIC - `errores_inyectados.json`: qué registros traen cada error, para verificar que Silver los
 # MAGIC   atrapa todos.
 # MAGIC - `resumen_esperado.json`: totales del programa.
+# MAGIC - `segmentos_clientes.csv` (v2): el segmento de gustos real de cada cuenta, para evaluar si
+# MAGIC   el recomendador de la Fase 4 aprendió los gustos correctos.
 
 # COMMAND ----------
+
+escribir_csv(os.path.join(RUTA_CONTROL, "segmentos_clientes.csv"), ["customer_id", "segmento"],
+             [[c["customer_id"], c["segmento"]] for c in clientes])
 
 filas_saldos, totales = [], Counter()
 for c in clientes:
@@ -934,6 +977,7 @@ resumen = {
     "pedidos_app": sum(v["origen"] == "APP" for v in visitas),
     "tickets_anonimos": sum(v["cliente"] is None for v in visitas),
     "errores": {k: len(set(v)) for k, v in sorted(errores.items())},
+    "segmentos": dict(Counter(c["segmento"] for c in clientes if c["pais"] == "GT")),
     "puntos": dict(totales),
 }
 with open(os.path.join(RUTA_CONTROL, "resumen_esperado.json"), "w", encoding="utf-8") as f:

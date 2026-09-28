@@ -539,18 +539,17 @@ assert all(v == 0 for v in expectativas.values()), "Silver no cumple sus expecta
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 11.2 ¿Silver detectó todos los errores inyectados?
+# MAGIC ### 11.2 Reporte de calidad: ¿qué problemas detectó Silver?
 # MAGIC
-# MAGIC Cada error E1–E18 deja una huella que Silver puede contar. Se compara contra lo que el
-# MAGIC generador reportó que inyectó (semilla 42). Es como una **prueba unitaria** del pipeline: si
-# MAGIC Silver dejara pasar un solo error, el conteo no cuadraría.
+# MAGIC Cada error E1–E18 deja una huella que Silver puede contar. Los conteos se guardan en
+# MAGIC `silver_calidad_detecciones`: es el **reporte de calidad de datos** de esta corrida, y la
+# MAGIC Fase 5 (`05_evaluacion`) lo compara contra lo que el generador inyectó.
+# MAGIC
+# MAGIC ¿Por qué no se compara aquí? Porque el pipeline **no debe leer la hoja de respuestas**: en
+# MAGIC producción no existe. La primera versión de este notebook comparaba contra números fijos de
+# MAGIC la semilla 42, y esa prueba se rompió en cuanto se regeneraron los datos.
 # MAGIC
 # MAGIC E10 no aparece aquí: un canje bajo el mínimo es una violación de regla (R15) y lo detecta Gold.
-# MAGIC
-# MAGIC **Errores que se cruzan:** el generador inyectó E8 en 244 pedidos y E9 en 144, pero 5 y 2 de
-# MAGIC ellos además tenían un campo faltante (E11). Silver los manda a cuarentena **antes** de
-# MAGIC deduplicar, así que aquí se esperan 239 y 142. Un registro corrupto no debe contar en ninguna
-# MAGIC otra métrica.
 
 # COMMAND ----------
 
@@ -570,8 +569,9 @@ detectado = {
     "E5  tickets con codigo inexistente": pos_t.filter(F.col("codigo_lealtad_valido") == False).count(),  # noqa: E712
     "E6  tickets cuyo total no cuadra": t.filter(~F.col("total_cuadra")).count(),
     "E7  tickets del POS anulados": pos_t.filter(F.col("estado") == "ANULADA").count(),
-    "E8  eventos duplicados de la app": b_app.filter(faltantes == "").count()
-                                        - b_app.filter(faltantes == "").dropDuplicates(["order_id", "status", "updated_at"]).count(),
+    "E8  pedidos con eventos duplicados": b_app.filter(faltantes == "")
+                                          .groupBy("order_id", "status", "updated_at").count()
+                                          .filter("count > 1").select("order_id").distinct().count(),
     "E9  pedidos de la app cancelados": app_t.filter(F.col("estado") == "ANULADA").count(),
     "E11 pedidos de la app en cuarentena": q.filter(F.col("fuente") == "app").count(),
     "E12 correos corregidos": b_cli.filter(F.col("email") != F.lower(F.trim("email"))).count(),
@@ -583,30 +583,23 @@ detectado = {
     "E18 saldos negativos en cuarentena": q.filter(F.col("fuente") == "legado").count(),
 }
 
-ESPERADO_SEMILLA_42 = {
-    "E1  filas de archivos reenviados": 68, "E2  tickets con canal mal escrito": 2_485,
-    "E3  tickets con coma decimal": 1_521, "E4  tickets con codigo mal escrito": 991,
-    "E5  tickets con codigo inexistente": 164, "E6  tickets cuyo total no cuadra": 467,
-    "E7  tickets del POS anulados": 978, "E8  eventos duplicados de la app": 239,
-    "E9  pedidos de la app cancelados": 142, "E11 pedidos de la app en cuarentena": 63,
-    "E12 correos corregidos": 241, "E13 cuentas duplicadas (no principales)": 150,
-    "E14 telefonos reformateados": 1_034, "E15 cuentas de Honduras": 100,
-    "E16 departamentos corregidos": 3, "E17 saldos pendientes de registro": 272,
-    "E18 saldos negativos en cuarentena": 7,
-}
-
 for error, n in detectado.items():
-    esperado = ESPERADO_SEMILLA_42[error]
-    print(f"{'OK ' if n == esperado else 'FALLA'} {error:<42} detectado {n:>6,} · esperado {esperado:>6,}")
+    print(f"{error:<42} {n:>7,}")
 
-assert detectado == ESPERADO_SEMILLA_42, "Silver no detectó exactamente los errores inyectados"
+calidad = spark.createDataFrame(
+    [(e.split()[0], " ".join(e.split()[1:]), n) for e, n in detectado.items()],
+    "error STRING, descripcion STRING, detectado LONG",
+).withColumn("_fecha_proceso", F.current_timestamp())
+
+escribir_silver(calidad, "silver_calidad_detecciones",
+                "Reporte de calidad: cuantos registros con cada tipo de error detecto Silver en esta corrida.")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 12. Resultado
 # MAGIC
-# MAGIC Siete tablas `silver_*` en `workspace.mimcdonalds`. Como cada una se construyó leyendo tablas
+# MAGIC Ocho tablas `silver_*` en `workspace.mimcdonalds`. Como cada una se construyó leyendo tablas
 # MAGIC con `spark.table(...)`, la pestaña **Lineage** de `silver_transacciones` ya muestra que viene
 # MAGIC de `bronze_pos_lineas` y `bronze_app_pedidos`.
 # MAGIC

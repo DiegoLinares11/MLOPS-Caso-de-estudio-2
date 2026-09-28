@@ -133,9 +133,11 @@ flowchart LR
 
     subgraph USO["Consumo"]
         direction TB
-        U1["POC: pruebas de las reglas"]
+        U1["05 Evaluación / POC<br/>vs hoja de respuestas"]
         U2["Dashboard"]
-        U3["Propuesta ML/AI"]
+        U3["04 Recomendador<br/>MLflow + Unity Catalog"]
+        U4[("gold_recomendaciones")]
+        U5["App / CRM"]
     end
 
     GEN --> F1 & F2 & F3 & F4 & F5 & F6
@@ -163,7 +165,8 @@ flowchart LR
 
     G1 & G6 --> U1
     G2 & G3 & G4 --> U2
-    G5 --> U3
+    S4 & S5 & G1 --> U3
+    U3 --> U4 --> U5
 
     classDef bronze fill:#e8d2b0,stroke:#8a5a2b,color:#3d2610
     classDef silver fill:#e4e7eb,stroke:#6c757d,color:#212529
@@ -171,7 +174,7 @@ flowchart LR
     classDef cuarentena fill:#f8d7da,stroke:#b02a37,color:#58151c
     class B1,B2,B3,B4,B5,B6 bronze
     class S1,S2,S3,S4,S5,S6 silver
-    class G0,G1,G2,G3,G4,G5,G6 gold
+    class G0,G1,G2,G3,G4,G5,G6,U4 gold
     class SQ cuarentena
 ```
 

@@ -167,7 +167,8 @@ borran**: van a una tabla de **cuarentena** con el motivo, para que se puedan au
 | Restaurantes | 30 (de 126) | Suficiente para ver diferencias por departamento |
 | Clientes | 5,000 | Cabe en Databricks Free Edition |
 | Periodo | **27-ago-2025 → 20-sep-2026** (~13 meses) | Debe pasar de 365 días para que **haya vencimientos reales** (R10) |
-| Tickets | **57,196** (49,607 POS + 7,589 app; 17,072 anónimos) | Resultado real del generador con semilla 42 |
+| Tickets | **56,239** (48,717 POS + 7,522 app; 17,327 anónimos) | Resultado real del generador v2 con semilla 42 |
+| Perfiles de gustos (v2) | 5 segmentos ocultos: res 31 %, pollo 21 %, desayuno 18 %, café y postres 15 %, familia 14 % | Sin gustos no hay preferencias que un recomendador pueda aprender (ver Fase 4) |
 
 ## 5. La hoja de respuestas (Volume `control`)
 
@@ -203,7 +204,7 @@ Supuestos que ambas implementaciones comparten:
 
 | Hallazgo | Dato |
 |---|---|
-| El tope diario castiga los pedidos grandes | El 23 % de los tickets de caja y el 45 % de los pedidos de la app superan Q100; se pierde **~18 %** de los puntos por tope |
+| El tope diario castiga los pedidos grandes | El 27 % de los tickets de mostrador y el 67 % de los pedidos de McDelivery superan Q100; se pierde **~22 %** de los puntos por tope (39 % en McDelivery) |
 | Vencimiento masivo al año del lanzamiento | Los puntos migrados se abonaron en ago-sep 2025 y vencen en ago-sep 2026 |
 
 ## 6. Arquitectura
