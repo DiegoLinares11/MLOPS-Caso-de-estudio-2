@@ -145,17 +145,17 @@ borran**: van a una tabla de **cuarentena** con el motivo, para que se puedan au
 | E2 | Canal escrito distinto (`Automac`, `AUTO MAC`, `drive`) | A | 5 % | Tabla de mapeo a valores canónicos |
 | E3 | Precio con **coma decimal** (`45,50`) | A | 3 % | Normalizar antes de convertir a decimal |
 | E4 | `codigo_lealtad` en minúsculas o con espacios | A | 4 % | `upper(trim())` antes del join |
-| E5 | Código de lealtad **que no existe** en el CRM | A | 1 % | Cuarentena |
+| E5 | Código de lealtad **que no existe** en el CRM | A | 1 % | El ticket **se conserva sin cliente** (la venta sí ocurrió) y se marca `codigo_lealtad_valido = false` |
 | E6 | `total_ticket_q` no cuadra con la suma de líneas | A | 1 % | Se recalcula desde las líneas; se marca el ticket |
 | E7 | Ticket **anulado** (llega una segunda fila con `ANULADA`) | A | 2 % | El ticket queda anulado y no acumula; si traía canje, los puntos **no se devuelven** (R14) |
 | E8 | Evento de la app **duplicado** (entrega "al menos una vez") | B | 3 % | Deduplicar por `order_id`, quedarse con el último `updated_at` |
 | E9 | Pedido cancelado después de entregado | B | 2 % | Igual que E7 |
 | E10 | Canje en McDelivery **bajo el mínimo** Q50/Q60 (R15) | B | 0.5 % | Se marca como violación de regla |
-| E11 | Campos faltantes en el JSON | B | 1 % | Cuarentena si falta una llave; nulo si es opcional |
+| E11 | Falta `customer_id`, `store_id` o `created_at` en el JSON | B | 1 % | Cuarentena: el contrato de la app promete esos campos siempre |
 | E12 | Correo con mayúsculas o espacios | C | 5 % | `lower(trim())` |
-| E13 | **Misma persona con dos cuentas** (mismo nombre y teléfono, distinto correo) (H6) | C | 3 % | Se marca como sospecha; es insumo para ML |
+| E13 | **Misma persona con dos cuentas** (mismo nombre y teléfono, distinto correo) (H6) | C | 3 % | Se marca como sospecha (la cuenta más antigua es la principal); es insumo para ML |
 | E14 | Teléfono en formatos distintos (`5555-1234`, `+50255551234`) | C | 30 % | Normalizar a E.164 |
-| E15 | Clientes de **Honduras** (R20) | C | 2 % | Se excluyen del programa GT |
+| E15 | Clientes de **Honduras** (R20) | C | 2 % | Silver los conserva con su país; Gold los excluye del programa GT (es una regla, R20) |
 | E16 | Departamento con y sin tilde (`Quiché` / `Quiche`) | D | 10 % | Normalizar |
 | E17 | Correos del programa anterior que **no se registraron** en el nuevo | F | 15 % | Quedan pendientes de migrar |
 | E18 | Saldo del programa anterior **negativo** | F | 0.5 % | Cuarentena |

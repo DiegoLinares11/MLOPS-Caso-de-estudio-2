@@ -64,3 +64,54 @@ En **Catalog → workspace → mimcdonalds → (tabla)**:
 - **Sample data:** una muestra de filas, con los errores tal como llegaron.
 - **Lineage:** el grafo que muestra que la tabla sale del Volume `landing`. Se completará
   solo cuando Silver y Gold lean estas tablas con `spark.table(...)`.
+
+## Notebook 02 · Silver
+
+Silver lee **solo tablas** (`spark.table("bronze_...")`), nunca archivos: así Unity Catalog
+registra el linaje Bronze → Silver.
+
+### Decisiones
+
+| Decisión | Alternativa descartada | Por qué |
+|---|---|---|
+| `try_cast` en vez de `cast` | `cast` directo | Serverless tiene el modo ANSI activo: un valor inválido con `cast` **detiene todo el pipeline**. Con `try_cast` queda nulo y va a cuarentena |
+| Horas como `TIMESTAMP_NTZ` en hora de Guatemala, con `convert_timezone` | `TIMESTAMP` normal con la sesión en UTC | El resultado **no depende de la zona horaria de la sesión**. Se comprobó corriendo Silver con la sesión en UTC y en Asia/Tokio: huellas idénticas |
+| POS y app en **la misma** `silver_transacciones` | Una tabla por origen | Las reglas de puntos deben aplicarse igual sin importar el canal |
+| Montos recalculados **desde las líneas** | Confiar en `total_ticket_q` | El total del POS puede estar mal (E6); las líneas son la fuente de verdad |
+| E5 (código inexistente): el ticket **se conserva sin cliente** | Mandarlo a cuarentena | La venta sí ocurrió; descartarla subestimaría las ventas del restaurante |
+| E11 (falta un campo llave en la app): **cuarentena** | Conservarlo con nulos | El contrato de la app promete esos campos; si faltan, el evento está corrupto |
+| E13 y E15 (duplicados y Honduras): **se marcan, no se borran** | Excluirlos aquí | Excluir cuentas del programa es una **regla de negocio** (R20, fraude): le toca a Gold |
+| Canales: quitar tildes y espacios + **mapa de alias** | Una lista de `if` por variante | Absorbe variantes nuevas (`AUTO-MAC`) sin tocar código; lo desconocido va a cuarentena |
+| Departamentos: **tabla de referencia** de los 22 oficiales | Corregir caso por caso | Mismo motivo |
+| Teléfonos a **E.164** usando el país de la cuenta | Asumir siempre +502 | Un número de 8 dígitos puede ser de Honduras |
+| Cuarentena: **una sola tabla** con fuente, motivo y registro original en JSON | Descartar filas | "¿Cuántos datos perdimos y por qué?" se responde con un `GROUP BY` |
+| Expectativas + `assert` al final | Revisar a ojo | Si Silver no cumple, el notebook se detiene y no publica una capa sucia |
+
+### Resultado esperado (semilla 42)
+
+| Tabla | Filas |
+|---|---|
+| `silver_restaurantes` | 30 |
+| `silver_clientes` | 5,250 (300 marcadas como sospecha de duplicado: 150 principales + 150 duplicadas) |
+| `silver_catalogo` | 12 |
+| `silver_transacciones` | 57,133 (49,607 POS + 7,526 app) |
+| `silver_lineas` | 112,870 |
+| `silver_legado` | 1,810 (272 pendientes de registro) |
+| `silver_cuarentena` | 70 (63 de la app + 7 del legado) |
+
+### Verificación contra la hoja de respuestas
+
+Silver cuenta la huella de cada error y la compara con lo que el generador inyectó. **Los 17
+errores que le tocan a Silver cuadran exactamente.** (E10 es una violación de regla y la
+detecta Gold.)
+
+Dos conteos difieren del resumen del generador, y está bien que así sea: 5 pedidos con evento
+duplicado (E8) y 2 cancelados (E9) **además** tenían un campo faltante (E11). Silver los manda
+a cuarentena antes de deduplicar, así que no los cuenta dos veces: 244 → 239 y 144 → 142.
+
+### Cómo se probó antes de subirlo
+
+Spark no puede leer archivos locales en Windows sin los binarios de Hadoop (`winutils`), así que
+se armó un arnés de prueba: construye Bronze **en memoria** a partir de los mismos archivos (todo
+texto, mismos metadatos) y ejecuta el notebook de Silver celda por celda en Spark 4.2 local, con
+el modo ANSI activo como en Serverless.
