@@ -1,0 +1,5 @@
+fuente,motivo,count
+app,campo_faltante:customer_id,20
+app,campo_faltante:created_at,19
+app,campo_faltante:store_id,16
+legado,saldo_legado_invalido,7

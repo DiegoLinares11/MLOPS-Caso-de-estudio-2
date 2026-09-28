@@ -1,0 +1,6 @@
+segmento,modelo_top3,popular_top3,modelo_top1,clientes
+CAFE_POSTRE,0.353,1.0,0.089,539
+DESAYUNO,0.131,0.0,0.031,674
+FAMILIA,0.351,1.0,0.096,607
+POLLO,1.0,1.0,0.925,777
+RES,0.937,0.0,0.151,1102

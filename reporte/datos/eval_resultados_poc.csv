@@ -1,0 +1,40 @@
+parte,prueba,esperado,obtenido,ok
+A,R1+R2 puntos = ceil(monto productos x 10),0,0,True
+A,R4 donaciones no suman (1120 tickets con donacion),0,0,True
+A,R7 canales excluidos con cliente identificado (1378) no acumulan,0,0,True
+A,R20 cuentas de Honduras (92 compras) sin movimientos,0,0,True
+A,"R8 otorgado = min(1000, calculado) en 28883 cliente-dias",0,0,True
+A,R10 vencimientos a los 365 dias (1399 lotes vencidos),0,0,True
+A,R10 lo vencido nunca supera lo abonado ese dia,0,0,True
+A,R14 canjes en ordenes anuladas descontados (104 canjes),0,0,True
+A,"R16 Big Tasty: 158 canjes a 7,000 y 87 a 7,500",0,0,True
+A,"R17 una bienvenida de 1,000 en la primera compra (4336 clientes)",0,0,True
+A,R17 bienvenidas = clientes que acumularon al menos una vez,4336,4336,True
+A,R21 migracion = saldo anterior x 10 (1423 cuentas),0,0,True
+B,E2 registros detectados = registros inyectados (2454),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E3 registros detectados = registros inyectados (1494),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E4 registros detectados = registros inyectados (998),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E5 registros detectados = registros inyectados (167),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E6 registros detectados = registros inyectados (445),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E7 registros detectados = registros inyectados (946),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E8 registros detectados = registros inyectados (237),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E9 registros detectados = registros inyectados (151),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E10 registros detectados = registros inyectados (33),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E11 registros detectados = registros inyectados (55),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E12 registros detectados = registros inyectados (272),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E13 registros detectados = registros inyectados (150),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E14 registros detectados = registros inyectados (990),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E15 registros detectados = registros inyectados (100),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E16 registros detectados = registros inyectados (3),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E17 registros detectados = registros inyectados (252),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E18 registros detectados = registros inyectados (7),0 faltantes / 0 falsas alarmas,0 faltantes / 0 falsas alarmas,True
+B,E1 filas de 11 archivos reenviados eliminadas,70,70,True
+C,clientes presentes en ambos lados,5150,5150,True
+C,puntos_acumulados: clientes con diferencia,0,0,True
+C,puntos_bienvenida: clientes con diferencia,0,0,True
+C,puntos_migrados: clientes con diferencia,0,0,True
+C,puntos_canjeados: clientes con diferencia,0,0,True
+C,puntos_vencidos: clientes con diferencia,0,0,True
+C,puntos_perdidos_por_tope: clientes con diferencia,0,0,True
+C,saldo_final: clientes con diferencia,0,0,True
+D,top-3 del modelo incluye algo de su gusto (3699 clientes) > baseline popular,> 0.52,0.622,True

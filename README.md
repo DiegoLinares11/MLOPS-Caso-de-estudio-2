@@ -17,7 +17,7 @@ Databricks Free Edition.
 | 3. Preparación de datos | [docs/03_preparacion_datos.md](docs/03_preparacion_datos.md) · [docs/arquitectura_medallion.md](docs/arquitectura_medallion.md) · notebooks 00 a 03 | Listo |
 | 4. Modelado | [docs/04_modelado.md](docs/04_modelado.md) · [notebooks/04_recomendador.py](notebooks/04_recomendador.py) | Listo |
 | 5. Evaluación | [docs/05_evaluacion.md](docs/05_evaluacion.md) · [notebooks/05_evaluacion.py](notebooks/05_evaluacion.py) — **39/39 pruebas OK** | Listo |
-| 6. Despliegue | Reporte final y recomendaciones | Pendiente |
+| 6. Despliegue | [reporte/Reporte_Caso_Estudio_2.pdf](reporte/Reporte_Caso_Estudio_2.pdf) · [notebook del reporte](reporte/Reporte_Caso_Estudio_2.ipynb) | Listo |
 
 ## Cómo correrlo en Databricks
 
@@ -44,6 +44,7 @@ También corre en local (`python notebooks/00_generador_datos.py`): escribe en `
 MLOPS-Caso-de-estudio-2/
 ├── docs/        # Documentación por fase y guía de la arquitectura medallion
 ├── diagramas/   # Arquitectura de datos (Mermaid)
+├── reporte/     # Reporte final (notebook + PDF), datos de resultados e imágenes
 └── notebooks/   # Notebooks de Databricks (formato .py)
     ├── 00_generador_datos.py   # Genera las fuentes sintéticas y la hoja de respuestas
     ├── 01_bronze.py            # Landing → 6 tablas bronze_*, todo como texto

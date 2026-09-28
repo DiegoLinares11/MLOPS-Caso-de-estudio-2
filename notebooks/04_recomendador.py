@@ -232,8 +232,11 @@ def con_etiqueta(df, corte):
               .fillna(0, ["y"]))
 
 
-entrenamiento = con_etiqueta(variables(CORTE_ENTRENAMIENTO), CORTE_ENTRENAMIENTO).toPandas()
-prueba = con_etiqueta(variables(CORTE_PRUEBA), CORTE_PRUEBA).toPandas()
+ORDEN = ["customer_id", "recompensa_id"]   # toPandas() no garantiza orden: se fija para reproducir
+entrenamiento = (con_etiqueta(variables(CORTE_ENTRENAMIENTO), CORTE_ENTRENAMIENTO).toPandas()
+                 .sort_values(ORDEN).reset_index(drop=True))
+prueba = (con_etiqueta(variables(CORTE_PRUEBA), CORTE_PRUEBA).toPandas()
+          .sort_values(ORDEN).reset_index(drop=True))
 for nombre, df in [("entrenamiento", entrenamiento), ("prueba", prueba)]:
     print(f"{nombre:<14} {df.customer_id.nunique():>5,} clientes · {len(df):>6,} pares · "
           f"{df.y.mean():.1%} positivos")
@@ -286,8 +289,10 @@ for nombre in ["baseline_popularidad", "baseline_frecuencia"]:
 
 modelos = {
     "regresion_logistica": make_pipeline(StandardScaler(), LogisticRegression(max_iter=2000)),
+    # early_stopping=False: sklearn lo activa solo con más de 10,000 filas, usando una partición
+    # aleatoria. Sin fijarlo, el modelo de producción (más filas) se entrenaría distinto al evaluado.
     "gradient_boosting": HistGradientBoostingClassifier(max_iter=200, learning_rate=0.05,
-                                                        random_state=SEMILLA),
+                                                        early_stopping=False, random_state=SEMILLA),
 }
 
 for nombre, modelo in modelos.items():
@@ -378,7 +383,7 @@ print(f"modelo registrado: {NOMBRE_MODELO}")
 
 # COMMAND ----------
 
-actuales = variables(FECHA_CORTE).toPandas()
+actuales = variables(FECHA_CORTE).toPandas().sort_values(ORDEN).reset_index(drop=True)
 actuales["puntaje"] = modelo_final.predict_proba(actuales[VARIABLES])[:, 1]
 actuales["posicion"] = (actuales.groupby("customer_id")["puntaje"]
                                 .rank(method="first", ascending=False).astype(int))
