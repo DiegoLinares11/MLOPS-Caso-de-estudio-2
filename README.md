@@ -16,7 +16,7 @@ Databricks Free Edition.
 | 2. Entendimiento de los datos | [docs/02_entendimiento_datos.md](docs/02_entendimiento_datos.md) · [diagramas/arquitectura.md](diagramas/arquitectura.md) | Listo |
 | 3. Preparación de datos | [docs/03_preparacion_datos.md](docs/03_preparacion_datos.md) · [docs/arquitectura_medallion.md](docs/arquitectura_medallion.md) · notebooks 00 a 03 | Listo |
 | 4. Modelado | [docs/04_modelado.md](docs/04_modelado.md) · [notebooks/04_recomendador.py](notebooks/04_recomendador.py) | Listo |
-| 5. Evaluación | POC del motor de puntos con pruebas | Pendiente |
+| 5. Evaluación | [docs/05_evaluacion.md](docs/05_evaluacion.md) · [notebooks/05_evaluacion.py](notebooks/05_evaluacion.py) — **39/39 pruebas OK** | Listo |
 | 6. Despliegue | Reporte final y recomendaciones | Pendiente |
 
 ## Cómo correrlo en Databricks
@@ -33,6 +33,8 @@ Databricks Free Edition.
    verifica el cuadre contable.
 7. Correr `notebooks/04_recomendador.py`: entrena el recomendador de recompensas con MLflow, lo
    registra en Unity Catalog y escribe `gold_recomendaciones`.
+8. Correr `notebooks/05_evaluacion.py`: la prueba funcional (POC). Compara todo contra la hoja de
+   respuestas del generador y guarda el resultado en `eval_resultados_poc`.
 
 También corre en local (`python notebooks/00_generador_datos.py`): escribe en `./_datos_locales/`.
 
@@ -47,5 +49,6 @@ MLOPS-Caso-de-estudio-2/
     ├── 01_bronze.py            # Landing → 6 tablas bronze_*, todo como texto
     ├── 02_silver.py            # Bronze → 7 tablas silver_*, limpias y unificadas
     ├── 03_gold.py              # Silver → ledger de puntos, saldos, KPIs y violaciones
-    └── 04_recomendador.py      # Modelo de recomendación de recompensas (MLflow)
+    ├── 04_recomendador.py      # Modelo de recomendación de recompensas (MLflow)
+    └── 05_evaluacion.py        # POC: reglas, calidad, saldos y recomendador vs hoja de respuestas
 ```
